@@ -13,6 +13,7 @@ type Game struct {
     Bombs   []int              `json:"bombs"`
     Clicks  []int              `json:"clicks"`
     Players map[string]*websocket.Conn
+    Turn    string             `json:"turn"`
     mutex   sync.Mutex
 }
 
@@ -62,12 +63,22 @@ func joinGame(roomID, playerID string, ws *websocket.Conn) {
     if game, exists := games[roomID]; exists {
         game.mutex.Lock()
         defer game.mutex.Unlock()
-        game.Players[playerID] = ws
+
+        if len(game.Players) < 2 {
+            game.Players[playerID] = ws
+            if len(game.Players) == 1 {
+                game.Turn = playerID
+            }
+        } else {
+            sendErrorMessage(ws, "Room is full")
+            return
+        }
     } else {
         games[roomID] = &Game{
             Bombs:   getBombs(),
             Clicks:  []int{},
             Players: map[string]*websocket.Conn{playerID: ws},
+            Turn:    playerID,
         }
     }
 
@@ -86,8 +97,20 @@ func handleClick(roomID, playerID string, index int) {
     game.mutex.Lock()
     defer game.mutex.Unlock()
 
+    if game.Turn != playerID {
+        sendErrorMessage(game.Players[playerID], "Not your turn")
+        return
+    }
+
     if !contains(game.Clicks, index) {
         game.Clicks = append(game.Clicks, index)
+        // Switch turn
+        for pid := range game.Players {
+            if pid != playerID {
+                game.Turn = pid
+                break
+            }
+        }
     }
 
     broadcastGameState(roomID)
@@ -108,6 +131,14 @@ func leaveGame(roomID, playerID string) {
     delete(game.Players, playerID)
     if len(game.Players) == 0 {
         delete(games, roomID)
+    } else {
+        if game.Turn == playerID {
+            for pid := range game.Players {
+                game.Turn = pid
+                break
+            }
+        }
+        broadcastGameState(roomID)
     }
 }
 
@@ -124,6 +155,16 @@ func broadcastGameState(roomID string) {
     for _, conn := range game.Players {
         websocket.JSON.Send(conn, response)
     }
+}
+
+func sendErrorMessage(ws *websocket.Conn, message string) {
+    websocket.JSON.Send(ws, struct {
+        Type    string `json:"type"`
+        Message string `json:"message"`
+    }{
+        Type:    "error",
+        Message: message,
+    })
 }
 
 func contains(slice []int, item int) bool {
