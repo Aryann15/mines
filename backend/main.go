@@ -104,6 +104,32 @@ func joinGame(roomID, playerID string, ws *websocket.Conn) {
     broadcastGameState(roomID)
 }
 
+func handleChat(roomID, playerID, message string) {
+    gamesMutex.Lock()
+    defer gamesMutex.Unlock()
+
+    game, exists := games[roomID]
+    if !exists {
+        return
+    }
+
+    game.mutex.Lock()
+    defer game.mutex.Unlock()
+
+    chatMsg := ChatMessage{
+        PlayerID:  playerID,
+        Message:   message,
+        Timestamp: time.Now(),
+    }
+    game.ChatHistory = append(game.ChatHistory, chatMsg)
+
+    if len(game.ChatHistory) > 50 {
+        game.ChatHistory = game.ChatHistory[len(game.ChatHistory)-50:]
+    }
+
+    broadcastGameState(roomID)
+}
+
 func handleClick(roomID, playerID string, index int) {
     gamesMutex.Lock()
     defer gamesMutex.Unlock()
