@@ -9,10 +9,12 @@ function App() {
   const [playerId, setPlayerId] = useState("");
   const [currentTurn, setCurrentTurn] = useState("");
   const [players, setPlayers] = useState({});
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
 
   useEffect(() => {
     const newSocket = new WebSocket("ws://localhost:8080/ws");
-    
+
     newSocket.onopen = () => {
       console.log("WebSocket connected");
     };
@@ -26,6 +28,7 @@ function App() {
           setClicks(data.clicks);
           setPlayers(data.players);
           setCurrentTurn(data.turn);
+          setChatMessages(data.chatHistory);
         } else if (data.type === "error") {
           alert(data.message);
         }
@@ -55,11 +58,20 @@ function App() {
     }
   }, [socket, roomId, playerId]);
 
-  const handleClick = useCallback((index) => {
-    if (!gameOver && !clicks.includes(index) && socket && socket.readyState === WebSocket.OPEN && currentTurn === playerId) {
-      socket.send(JSON.stringify({ type: "click", roomId, playerId, index }));
-    }
-  }, [gameOver, clicks, socket, roomId, playerId, currentTurn]);
+  const handleClick = useCallback(
+    (index) => {
+      if (
+        !gameOver &&
+        !clicks.includes(index) &&
+        socket &&
+        socket.readyState === WebSocket.OPEN &&
+        currentTurn === playerId
+      ) {
+        socket.send(JSON.stringify({ type: "click", roomId, playerId, index }));
+      }
+    },
+    [gameOver, clicks, socket, roomId, playerId, currentTurn]
+  );
 
   const resetGame = useCallback(() => {
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -69,7 +81,7 @@ function App() {
   }, [socket, roomId]);
 
   useEffect(() => {
-    if (clicks.some(click => bombs.includes(click))) {
+    if (clicks.some((click) => bombs.includes(click))) {
       setGameOver(true);
     }
   }, [clicks, bombs]);
@@ -102,39 +114,40 @@ function App() {
             Join Room
           </button>
         </div>
-        <div className="mb-4">
-          Current Turn: {currentTurn}
-        </div>
+        <div className="mb-4">Current Turn: {currentTurn}</div>
         <div className="grid grid-cols-5 gap-3 mb-6">
-          {Array(25).fill(0).map((_, index) => {
-            const isClicked = clicks.includes(index);
-            const isBomb = bombs.includes(index);
-            return (
-              <div
-                onClick={() => handleClick(index)}
-                key={index}
-                className={`
+          {Array(25)
+            .fill(0)
+            .map((_, index) => {
+              const isClicked = clicks.includes(index);
+              const isBomb = bombs.includes(index);
+              return (
+                <div
+                  onClick={() => handleClick(index)}
+                  key={index}
+                  className={`
                   flex justify-center items-center rounded-lg w-16 h-16 
                   shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer
-                  ${isClicked 
-                    ? isBomb
-                      ? 'bg-red-500 text-white'
-                      : 'bg-green-400 text-indigo-800'
-                    : 'bg-gradient-to-br from-indigo-400 to-indigo-500 text-white'
+                  ${
+                    isClicked
+                      ? isBomb
+                        ? "bg-red-500 text-white"
+                        : "bg-green-400 text-indigo-800"
+                      : "bg-gradient-to-br from-indigo-400 to-indigo-500 text-white"
                   }
                 `}
-              >
-                <p className="text-2xl font-bold">
-                  {isClicked ? (isBomb ? "💣" : "✓") : ""}
-                </p>
-              </div>
-            );
-          })}
+                >
+                  <p className="text-2xl font-bold">
+                    {isClicked ? (isBomb ? "💣" : "✓") : ""}
+                  </p>
+                </div>
+              );
+            })}
         </div>
         {gameOver && (
           <div className="text-center">
             <p className="text-2xl font-bold text-red-600 mb-4">Game Over!</p>
-            <button 
+            <button
               onClick={resetGame}
               className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded transition-colors duration-300"
             >
