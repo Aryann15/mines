@@ -16,6 +16,13 @@ type Game struct {
     Turn     string             `json:"turn"`
     Conns    map[string]*websocket.Conn
     mutex    sync.Mutex
+    ChatHistory []ChatMessage `json:"chatHistory"`
+}
+
+type ChatMessage struct {
+    PlayerID string `json:"playerId"`
+    Message  string `json:"message"`
+    Timestamp time.Time `json:"timestamp"`
 }
 
 type Message struct {
@@ -23,6 +30,7 @@ type Message struct {
     RoomID  string `json:"roomId,omitempty"`
     PlayerID string `json:"playerId,omitempty"`
     Index   int    `json:"index,omitempty"`
+    ChatMessage string `json:"chatMessage,omitempty"` 
 }
 
 var games = make(map[string]*Game)
@@ -53,6 +61,8 @@ func handleWebSocket(ws *websocket.Conn) {
             handleClick(roomID, playerID, msg.Index)
         case "newGame":
             resetGame(roomID)
+        case "chat":
+            handleChat(roomID, playerID, msg.ChatMessage)
         default:
             log.Println("Unknown message type:", msg.Type)
         }
