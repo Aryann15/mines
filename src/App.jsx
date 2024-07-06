@@ -73,6 +73,13 @@ function App() {
     [gameOver, clicks, socket, roomId, playerId, currentTurn]
   );
 
+  const sendChatMessage = useCallback(() => {
+    if (socket && socket.readyState === WebSocket.OPEN && roomId && playerId && chatInput.trim()) {
+      socket.send(JSON.stringify({ type: "chat", roomId, playerId, chatMessage: chatInput.trim() }));
+      setChatInput("");
+    }
+  }, [socket, roomId, playerId, chatInput]);
+  
   const resetGame = useCallback(() => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: "newGame", roomId }));
