@@ -10,11 +10,19 @@ import (
 )
 
 type Game struct {
-    Bombs   []int              `json:"bombs"`
-    Clicks  []int              `json:"clicks"`
-    Players map[string]*websocket.Conn
-    Turn    string             `json:"turn"`
-    mutex   sync.Mutex
+    Bombs    []int              `json:"bombs"`
+    Clicks   []int              `json:"clicks"`
+    Players  map[string]bool    `json:"players"`
+    Turn     string             `json:"turn"`
+    Conns    map[string]*websocket.Conn
+    mutex    sync.Mutex
+}
+
+type Message struct {
+    Type    string `json:"type"`
+    RoomID  string `json:"roomId,omitempty"`
+    PlayerID string `json:"playerId,omitempty"`
+    Index   int    `json:"index,omitempty"`
 }
 
 var games = make(map[string]*Game)
@@ -27,17 +35,14 @@ func handleWebSocket(ws *websocket.Conn) {
     var roomID string
 
     for {
-        var msg struct {
-            Type    string `json:"type"`
-            RoomID  string `json:"roomId"`
-            PlayerID string `json:"playerId"`
-            Index   int    `json:"index"`
-        }
+        var msg Message
         err := websocket.JSON.Receive(ws, &msg)
         if err != nil {
             log.Println("Error receiving message:", err)
             break
         }
+
+        log.Printf("Received message: %+v\n", msg)
 
         switch msg.Type {
         case "join":
@@ -67,7 +72,8 @@ func joinGame(roomID, playerID string, ws *websocket.Conn) {
         defer game.mutex.Unlock()
 
         if len(game.Players) < 2 {
-            game.Players[playerID] = ws
+            game.Players[playerID] = true
+            game.Conns[playerID] = ws
             if len(game.Players) == 1 {
                 game.Turn = playerID
             }
@@ -79,8 +85,9 @@ func joinGame(roomID, playerID string, ws *websocket.Conn) {
         games[roomID] = &Game{
             Bombs:   getBombs(),
             Clicks:  []int{},
-            Players: map[string]*websocket.Conn{playerID: ws},
+            Players: map[string]bool{playerID: true},
             Turn:    playerID,
+            Conns:   map[string]*websocket.Conn{playerID: ws},
         }
     }
 
@@ -100,7 +107,7 @@ func handleClick(roomID, playerID string, index int) {
     defer game.mutex.Unlock()
 
     if game.Turn != playerID {
-        sendErrorMessage(game.Players[playerID], "Not your turn")
+        sendErrorMessage(game.Conns[playerID], "Not your turn")
         return
     }
 
@@ -153,6 +160,8 @@ func leaveGame(roomID, playerID string) {
     defer game.mutex.Unlock()
 
     delete(game.Players, playerID)
+    delete(game.Conns, playerID)
+
     if len(game.Players) == 0 {
         delete(games, roomID)
     } else {
@@ -176,7 +185,7 @@ func broadcastGameState(roomID string) {
         Game: game,
     }
 
-    for _, conn := range game.Players {
+    for _, conn := range game.Conns {
         websocket.JSON.Send(conn, response)
     }
 }
