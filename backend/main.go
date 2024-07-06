@@ -1,3 +1,4 @@
+// main.go
 package main
 
 import (
@@ -46,6 +47,8 @@ func handleWebSocket(ws *websocket.Conn) {
             joinGame(roomID, playerID, ws)
         case "click":
             handleClick(roomID, playerID, msg.Index)
+        case "newGame":
+            resetGame(roomID)
         default:
             log.Println("Unknown message type:", msg.Type)
         }
@@ -111,6 +114,28 @@ func handleClick(roomID, playerID string, index int) {
                 break
             }
         }
+    }
+
+    broadcastGameState(roomID)
+}
+
+func resetGame(roomID string) {
+    gamesMutex.Lock()
+    defer gamesMutex.Unlock()
+
+    game, exists := games[roomID]
+    if !exists {
+        return
+    }
+
+    game.mutex.Lock()
+    defer game.mutex.Unlock()
+
+    game.Bombs = getBombs()
+    game.Clicks = []int{}
+    for pid := range game.Players {
+        game.Turn = pid
+        break
     }
 
     broadcastGameState(roomID)
