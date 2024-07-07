@@ -9,7 +9,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   rules:
-  - host: mines.yourdomain.com
+  - host: minestbd.com
     http:
       paths:
       - path: /api(/|$)(.*)
