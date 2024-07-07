@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mines-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mines-backend
+  template:
+    metadata:
+      labels:
+        app: mines-backend
+    spec:
+      containers:
+      - name: mines-backend
+        image: your-registry/mines-backend:v1
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
